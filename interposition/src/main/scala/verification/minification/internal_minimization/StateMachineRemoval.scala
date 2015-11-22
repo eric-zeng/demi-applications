@@ -1,5 +1,7 @@
 package akka.dispatch.verification
 
+import java.io.{File, PrintWriter}
+import synoptic.main.SynopticMain
 import scala.collection.mutable.ListBuffer
 
 // A RemovalStrategy that maintains a model of the program's state
@@ -11,6 +13,8 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
   // Return how many events we were unwilling to ignore, e.g. because they've
   // been marked by the application as unignorable.
   def unignorable: Int = 0
+
+  var timesRun: Int = 0
 
   // Return the next schedule to explore.
   // If there aren't any more schedules to check, return None.
@@ -26,7 +30,39 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
   override def getNextTrace(lastFailingTrace: EventTrace,
                    alreadyRemoved: MultiSet[(String,String,MessageFingerprint)],
                    violationTriggered: Boolean): Option[EventTrace] = {
-    return None
+    timesRun = timesRun + 1
+    val metaTrace = HistoricalEventTraces.current
+
+    val file = new File("temp/trace_log_" + timesRun + ".tmp")
+    file.getParentFile.mkdirs
+
+    val writer = new PrintWriter(file)
+    metaTrace.getOrderedLogOutput foreach { log =>
+      writer.println(log)
+    }
+    writer.close
+
+    val regexes = Array(
+      "^.*there\\sis\\sno\\sleader.*(?<TYPE=>no_leader)$",
+      "^.*Initializing\\selection.*(?<TYPE=>starting_election)$"
+    )
+
+    val regexArgs = regexes flatMap { regex =>
+      Array("-r", regex)
+    }
+
+    val args = Array("temp/trace_log_" + timesRun + ".tmp") ++ regexArgs ++ Array("-o", "temp/output_" + timesRun, "-i")
+    System.out.println("Running synoptic ")
+    args foreach { arg => System.out.print(arg) }
+    System.out.println()
+    val main = SynopticMain.processArgs(args)
+    val pGraph = main.createInitialPartitionGraph()
+    if (pGraph != null) {
+      main.runSynoptic(pGraph)
+      None
+    } else {
+      None
+    }
   }
 }
 
