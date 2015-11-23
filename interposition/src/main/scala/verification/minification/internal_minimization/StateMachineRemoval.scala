@@ -45,6 +45,20 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
     val regexes = Array(
       "^.*there\\sis\\sno\\sleader.*(?<TYPE=>no_leader)$",
       "^.*Initializing\\selection.*(?<TYPE=>starting_election)$"
+      // "^\\[(?<dispatcher>.+)\]\\s\\[(?<member>.+1)\\]\\s.*there\\sis\\sno\\sleader.*(?<TYPE=>no_leader)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Tried\\sto\\sinitialize\\selection\\swith\\sno\\smembers.*(?<TYPE=>failed_election_no_members)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Initializing\\selection.*(?<TYPE=>starting_election)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Rejecting\\sRequestVote\\smsg\\sby.*Received\\sstale.*(?<TYPE=>rejected_vote_request_stale)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Revert\\sto\\sfollower\\sstate.*(?<TYPE=>revert_to_follower_state)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Voting\\sfor.*(?<TYPE=>voting)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Rejecting\\svote\\sfor.*already\\svoted\\sfor.*(?<TYPE=>rejected_vote_request_already_voted)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Rejecting\\sVoteCandidate\\smsg\\sby.*Received\\sstale.*(?<TYPE=>rejected_vote_candidate_stale)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Received\\svote\\sby.*Won\\selection\\swith.*of.*votes.*(?<TYPE=>won_election)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Received\\svote\\sby.*Have.*of.*votes.*(?<TYPE=>recieved_vote)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Candidate\\sis\\sdeclined\\sby.*in\\sterm.*(?<TYPE=>candidate_declined)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Reverting\\sto\\sFollower,\\sbecause\\sgot\\sAppendEntries\\sfrom\\sLeader\\sin.*,\\sbut\\sam\\sin.*(?<TYPE=>reverting_to_follower_state_AppendEntries)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Voting\\stimeout,\\sstarting\\sa\\snew\\selection.*(?<TYPE=>voting_timeout_starting_new_election)$" 
+      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Voting\\stimeout,\\sunable\\sto\\sstart\\selection,\\sdon't\\sknow\\senough\\snodes.*(?<TYPE=>voting_timeout_too_few_nodes)$" 
     )
 
     val regexArgs = regexes flatMap { regex =>
