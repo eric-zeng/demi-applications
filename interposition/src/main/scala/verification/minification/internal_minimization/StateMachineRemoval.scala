@@ -78,8 +78,54 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
       None
     }
   }
-}
+  
+  def removeFirstCycle(lastFailingTrace: EventTrace): Option[EventTrace] = {
+    // Some quick pseudocode for finding a cylce in the state machine and 
+    // creating an EventTrace that would remove it.
 
+    // Need some way to skip ahead so we can try to remove other cycles if the 
+    // first cycle found is actually needed to triger the violation.
+
+    
+    // eventTrace: the ordered list of events
+    // seen: a set of state nodes already seen
+    // eventStack: events seen so far
+    // result: a new EventTrace with a cycle removed
+
+    // // first node of event trace
+    // cur = eventTrace.first
+    // while (!cycle && cur != eventTrace.last) {
+    //   if (seen.contains(getNode(cur))) {
+    //     // cycle detected
+    //     cycle = true
+    //     while (getNode(popped) != getNode(cur)) {
+    //       // remove all events in the cycle
+    //       popped = eventStack.pop()
+    //     }
+    //     // reverse the order of the stack
+    //     reverse(eventStack)
+
+    //     while (!eventStack.isEmpty()) {
+    //     // add the events before the cycle
+    //       result.add(eventStack.pop())
+    //     }
+
+    //     while (cur != eventTrace.last)) {
+    //       // add the events after the cycle
+    //       cur = eventTrace.next
+    //       result.add(cur)
+    //     }
+        
+    //   } else {
+    //     eventStack.push(cur)
+    //     seen.add(getNode(cur))
+    //     cur = eventTrace.next
+    //   }
+    // }
+
+    // return result
+  }
+}
 // Stores all (Meta)EventTraces that have been executed in the past
 object HistoricalEventTraces {
   def current: MetaEventTrace = traces.last
