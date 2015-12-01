@@ -1,6 +1,7 @@
 package akka.dispatch.verification
 
 import java.io.{File, PrintWriter}
+import java.util.Scanner
 import synoptic.main.SynopticMain
 import scala.collection.mutable.ListBuffer
 
@@ -136,3 +137,46 @@ object HistoricalEventTraces {
   // If you want fast lookup of EventTraces, you could populate a HashMap here:
   // { EventTrace -> MetaEventTrace }
 }
+
+class DotGraph {
+  var idToNodes = Map.empty[Int, Node]
+  var labelToNodes = Map.empty[String, Seq[Node]]
+  var adjList = Map.empty[Node, Seq[Node]]
+
+  def parseFromFile(filename: String): Unit = {
+    val f = new File(filename)
+    val s = new Scanner(f)
+    s.nextLine()
+    while (s.hasNextLine) {
+      val line = s.nextLine()
+      if (line.startsWith("  ")) {
+        val id = Integer.parseInt(line.split(" "){0})
+
+        val startQuote = line.indexOf('"')
+        val endQuote = line.indexOf('"', startQuote + 1)
+        val label = line.substring(startQuote + 1, endQuote)
+
+        val node = new Node(id, label)
+        adjList += ((node, Seq.empty[Node]))
+        idToNodes += ((id, node))
+
+        if (labelToNodes.contains(label)) {
+          labelToNodes += ((label, labelToNodes.get(label).get ++ Seq(node)))
+        } else {
+          labelToNodes += ((label, Seq(node)))
+        }
+      } else {
+        val tokens = line.split("->")
+        val source = Integer.parseInt(tokens{0})
+        val dest = Integer.parseInt(tokens{1}.split(" "){0})
+
+        val sourceNode = idToNodes.get(source).get
+        val destNode = idToNodes.get(dest).get
+        adjList += ((sourceNode, adjList.get(sourceNode).get ++ Seq(destNode)))
+      }
+    }
+  }
+}
+
+
+class Node(val id: Int, val label: String)
