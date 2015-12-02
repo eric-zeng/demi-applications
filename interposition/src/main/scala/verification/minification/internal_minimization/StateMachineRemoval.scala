@@ -17,6 +17,24 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
 
   var timesRun: Int = 0
 
+
+  val states = Array(
+    new State(".*there\\\\sis\\\\sno\\\\sleader.*", "no_leader"),
+    new State(".*Initializing\\\\selection.*","starting_election")
+  )
+
+  def labelForLogMessage(msg: String): String = {
+    val matching = states.filter { state =>
+      msg.matches(state.regex)
+    }
+    if (matching.length != 1) {
+      System.out.println("Found " + matching.length + " synoptic labels matching message " + msg)
+      matching{0}.label
+    } else {
+      matching{0}.label
+    }
+  }
+
   // Return the next schedule to explore.
   // If there aren't any more schedules to check, return None.
   // Args:
@@ -43,9 +61,11 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
     }
     writer.close
 
-    val regexes = Array(
-      "^.*there\\sis\\sno\\sleader.*(?<TYPE=>no_leader)$",
-      "^.*Initializing\\selection.*(?<TYPE=>starting_election)$"
+
+
+//    val regexes = Array(
+//      "^.*there\\sis\\sno\\sleader.*(?<TYPE=>no_leader)$",
+//      "^.*Initializing\\selection.*(?<TYPE=>starting_election)$"
       // "^\\[(?<dispatcher>.+)\]\\s\\[(?<member>.+1)\\]\\s.*there\\sis\\sno\\sleader.*(?<TYPE=>no_leader)$" 
       // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Tried\\sto\\sinitialize\\selection\\swith\\sno\\smembers.*(?<TYPE=>failed_election_no_members)$" 
       // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Initializing\\selection.*(?<TYPE=>starting_election)$" 
@@ -60,8 +80,8 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
       // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Reverting\\sto\\sFollower,\\sbecause\\sgot\\sAppendEntries\\sfrom\\sLeader\\sin.*,\\sbut\\sam\\sin.*(?<TYPE=>reverting_to_follower_state_AppendEntries)$" 
       // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Voting\\stimeout,\\sstarting\\sa\\snew\\selection.*(?<TYPE=>voting_timeout_starting_new_election)$" 
       // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Voting\\stimeout,\\sunable\\sto\\sstart\\selection,\\sdon't\\sknow\\senough\\snodes.*(?<TYPE=>voting_timeout_too_few_nodes)$" 
-    )
-
+  //  )
+    val regexes = states.map(state => state.synopticRegex)
     val regexArgs = regexes flatMap { regex =>
       Array("-r", regex)
     }
@@ -143,6 +163,19 @@ class DotGraph {
   var labelToNodes = Map.empty[String, Seq[Node]]
   var adjList = Map.empty[Node, Seq[Node]]
 
+  def resolvePath(source: Node, destLabel: String): Node = {
+    val sameLabels = labelToNodes.get(destLabel).get
+    val possibleNodes = adjList.get(source).get
+
+    val result = possibleNodes.union(sameLabels)
+    if (result.length != 1) {
+      System.out.println("Found " + result.length + " possible destinations for source node " + source)
+      result.foreach(node => System.out.println(node))
+      result.head
+    }
+    result.head
+  }
+
   def parseFromFile(filename: String): Unit = {
     val f = new File(filename)
     val s = new Scanner(f)
@@ -178,5 +211,10 @@ class DotGraph {
   }
 }
 
+class Node(val id: Int, val label: String) {
+  override def toString: String = "Node[id=" + id + ", label=" + label + "]"
+}
 
-class Node(val id: Int, val label: String)
+class State(val regex: String, val label: String) {
+  def synopticRegex: String = "^" + regex + "(?<TYPE=>" + label + ")$"
+}
