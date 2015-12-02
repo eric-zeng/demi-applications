@@ -94,13 +94,15 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
     val pGraph = main.createInitialPartitionGraph()
     if (pGraph != null) {
       main.runSynoptic(pGraph)
+      val stateGraph = new DotGraph("temp/output_" + timesRun + ".dot")
+      removeFirstCycle(stateGraph, metaTrace)
       None
     } else {
       None
     }
   }
   
-  def removeFirstCycle(lastFailingTrace: EventTrace): Option[EventTrace] = {
+  def removeFirstCycle(stateGraph: DotGraph, metaTrace: MetaEventTrace): Option[EventTrace] = {
     // Some quick pseudocode for finding a cylce in the state machine and 
     // creating an EventTrace that would remove it.
 
@@ -113,9 +115,35 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
     // eventStack: events seen so far
     // result: a new EventTrace with a cycle removed
 
-    // // first node of event trace
-    // cur = eventTrace.first
-    // while (!cycle && cur != eventTrace.last) {
+
+
+    // first node of event trace
+    var events = metaTrace.trace.getEvents()
+    var curNode = stateGraph.labelToNodes.get("INITIAL").get.head
+    var visited = Set(curNode)
+
+    var i = 0
+    for (i <- 0 to events.length) {
+      var nextEvent = events(i)
+      val messages = metaTrace.eventToLogOutput(nextEvent)
+      for (j <- 0 to messages.length) {
+        curNode = stateGraph.resolvePath(curNode, labelForLogMessage(messages(j)))
+      }
+
+      if (visited.contains(curNode)) {
+        // cycle detected
+        // TODO
+        // save the node that starts/ends the cycle and the event that ended it
+        // find the event that reaches that node first
+        // output the events up to and included that event
+        // output all events after the event that ended the cycle
+
+
+      } else {
+        visited += curNode
+      }
+    }
+
     //   if (seen.contains(getNode(cur))) {
     //     // cycle detected
     //     cycle = true
@@ -158,10 +186,12 @@ object HistoricalEventTraces {
   // { EventTrace -> MetaEventTrace }
 }
 
-class DotGraph {
+class DotGraph(filename: String) {
   var idToNodes = Map.empty[Int, Node]
   var labelToNodes = Map.empty[String, Seq[Node]]
   var adjList = Map.empty[Node, Seq[Node]]
+
+  parseFromFile(filename)
 
   def resolvePath(source: Node, destLabel: String): Node = {
     val sameLabels = labelToNodes.get(destLabel).get
