@@ -4,6 +4,7 @@ import java.io.{File, PrintWriter}
 import java.util.Scanner
 import synoptic.main.SynopticMain
 import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Stack
 
 // A RemovalStrategy that maintains a model of the program's state
 // machine, and uses the model to decide which schedules to explore next.
@@ -119,18 +120,20 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
 
     // first node of event trace
     var events = metaTrace.trace.getEvents()
-    var curNode = stateGraph.labelToNodes.get("INITIAL").get.head
-    var visited = Set(curNode)
+    var src = stateGraph.labelToNodes.get("INITIAL").get.head
+    var visited = Set(src)
+    val eventStack = new Stack[(Node, Node, Event)]()
 
     var i = 0
-    for (i <- 0 to events.length) {
-      var nextEvent = events(i)
-      val messages = metaTrace.eventToLogOutput(nextEvent)
-      for (j <- 0 to messages.length) {
-        curNode = stateGraph.resolvePath(curNode, labelForLogMessage(messages(j)))
+    for (event <- events) {
+      val messages = metaTrace.eventToLogOutput(event)
+      var dst = src
+      for (message <- messages) {
+        // don't mark nodes in the middle of an event's messages as seen.
+         dst = stateGraph.resolvePath(dst, labelForLogMessage(message))
       }
 
-      if (visited.contains(curNode)) {
+      if (visited.contains(dst)) {
         // cycle detected
         // TODO
         // save the node that starts/ends the cycle and the event that ended it
@@ -140,7 +143,9 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
 
 
       } else {
-        visited += curNode
+        visited += dst
+        eventStack.push((src, dst, event))
+        src = dst
       }
     }
 
