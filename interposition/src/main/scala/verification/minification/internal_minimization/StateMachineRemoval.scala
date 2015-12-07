@@ -18,7 +18,6 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
 
   var timesRun: Int = 0
 
-
   val states = Array(
     new State(".*there\\\\sis\\\\sno\\\\sleader.*", "no_leader"),
     new State(".*Initializing\\\\selection.*","starting_election")
@@ -119,7 +118,7 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
 
 
     // first node of event trace
-    var events = metaTrace.trace.getEvents()
+    val events = metaTrace.trace.getEvents()
     var src = stateGraph.labelToNodes.get("INITIAL").get.head
     var visited = Set(src)
     val eventStack = new Stack[(Node, Node, Event)]()
@@ -140,7 +139,6 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
         // find the event that reaches that node first
         // output the events up to and included that event
         // output all events after the event that ended the cycle
-
 
       } else {
         visited += dst
@@ -178,6 +176,7 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
     // }
 
     // return result
+    None
   }
 }
 // Stores all (Meta)EventTraces that have been executed in the past
