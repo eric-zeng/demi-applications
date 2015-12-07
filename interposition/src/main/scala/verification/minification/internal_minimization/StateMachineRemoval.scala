@@ -2,6 +2,7 @@ package akka.dispatch.verification
 
 import java.io.{File, PrintWriter}
 import java.util.Scanner
+import org.slf4j.LoggerFactory
 import synoptic.main.SynopticMain
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Stack
@@ -12,6 +13,8 @@ import scala.collection.mutable.Stack
 // (http://homes.cs.washington.edu/~mernst/pubs/synoptic-fse2011.pdf)
 // to build the model from console output of each execution we've tried so far.
 class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: FingerprintFactory) extends RemovalStrategy {
+  val logger = LoggerFactory.getLogger("StateMachineRemoval")
+
   // Return how many events we were unwilling to ignore, e.g. because they've
   // been marked by the application as unignorable.
   def unignorable: Int = 0
@@ -19,8 +22,20 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
   var timesRun: Int = 0
 
   val states = Array(
-    new State(".*there\\\\sis\\\\sno\\\\sleader.*", "no_leader"),
-    new State(".*Initializing\\\\selection.*","starting_election")
+    State(".*there\\\\sis\\\\sno\\\\sleader.*", "no_leader"),
+    State(".*Initializing\\\\selection.*","initializing_election"),
+    State(".*Tried\\sto\\sinitialize\\selection\\swith\\sno\\smembers.*", "initializing_election_no_members"),
+    State(".*Rejecting\\sRequestVote\\smsg\\sby.*Received\\sstale.*", "rejected_vote_request_stale"),
+    State(".*Revert\\sto\\sfollower\\sstate.*", "revert_to_follower_state"),
+    State(".*Voting\\sfor.*", "voting"),
+    State(".*Rejecting\\svote\\sfor.*already\\svoted\\sfor.*", "rejected_vote_request_already_voted"),
+    State(".*Rejecting\\sVoteCandidate\\smsg\\sby.*Received\\sstale.*", "rejected_vote_candidate_stale"),
+    State(".*Received\\svote\\sby.*Won\\selection\\swith.*of.*votes.*", "won_election"),
+    State(".*Received\\svote\\sby.*Have.*of.*votes.*", "recieved_vote"),
+    State(".*Candidate\\sis\\sdeclined\\sby.*in\\sterm.*", "candidate_declined"),
+    State(".*Reverting\\sto\\sFollower,\\sbecause\\sgot\\sAppendEntries\\sfrom\\sLeader\\sin.*,\\sbut\\sam\\sin.*", "reverting_to_follower_state_AppendEntries"),
+    State(".*Voting\\stimeout,\\sstarting\\sa\\snew\\selection.*", "voting_timeout_starting_new_election"),
+    State(".*Voting\\stimeout,\\sunable\\sto\\sstart\\selection,\\sdon't\\sknow\\senough\\snodes.*", "voting_timeout_too_few_nodes")
   )
 
   def labelForLogMessage(msg: String): String = {
@@ -59,42 +74,24 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
     metaTrace.getOrderedLogOutput foreach { log =>
       writer.println(log)
     }
-    writer.close
+    writer.close()
 
-
-
-//    val regexes = Array(
-//      "^.*there\\sis\\sno\\sleader.*(?<TYPE=>no_leader)$",
-//      "^.*Initializing\\selection.*(?<TYPE=>starting_election)$"
-      // "^\\[(?<dispatcher>.+)\]\\s\\[(?<member>.+1)\\]\\s.*there\\sis\\sno\\sleader.*(?<TYPE=>no_leader)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Tried\\sto\\sinitialize\\selection\\swith\\sno\\smembers.*(?<TYPE=>failed_election_no_members)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Initializing\\selection.*(?<TYPE=>starting_election)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Rejecting\\sRequestVote\\smsg\\sby.*Received\\sstale.*(?<TYPE=>rejected_vote_request_stale)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Revert\\sto\\sfollower\\sstate.*(?<TYPE=>revert_to_follower_state)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Voting\\sfor.*(?<TYPE=>voting)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Rejecting\\svote\\sfor.*already\\svoted\\sfor.*(?<TYPE=>rejected_vote_request_already_voted)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Rejecting\\sVoteCandidate\\smsg\\sby.*Received\\sstale.*(?<TYPE=>rejected_vote_candidate_stale)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Received\\svote\\sby.*Won\\selection\\swith.*of.*votes.*(?<TYPE=>won_election)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Received\\svote\\sby.*Have.*of.*votes.*(?<TYPE=>recieved_vote)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Candidate\\sis\\sdeclined\\sby.*in\\sterm.*(?<TYPE=>candidate_declined)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Reverting\\sto\\sFollower,\\sbecause\\sgot\\sAppendEntries\\sfrom\\sLeader\\sin.*,\\sbut\\sam\\sin.*(?<TYPE=>reverting_to_follower_state_AppendEntries)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Voting\\stimeout,\\sstarting\\sa\\snew\\selection.*(?<TYPE=>voting_timeout_starting_new_election)$" 
-      // "^\\[(?<dispatcher>.+)\\]\\s\\[(?<member>.+1)\\]\\s.*Voting\\stimeout,\\sunable\\sto\\sstart\\selection,\\sdon't\\sknow\\senough\\snodes.*(?<TYPE=>voting_timeout_too_few_nodes)$" 
-  //  )
+    // Collect each regex, formatted for Synoptic
     val regexes = states.map(state => state.synopticRegex)
+    // Insert -r before each regex
     val regexArgs = regexes flatMap { regex =>
       Array("-r", regex)
     }
 
+    // The command passed to Synoptic
     val args = Array("temp/trace_log_" + timesRun + ".tmp") ++ regexArgs ++ Array("-o", "temp/output_" + timesRun, "-i")
-    System.out.println("Running synoptic ")
-    args foreach { arg => System.out.print(arg) }
-    System.out.println()
+    logger.info("Running Synoptic...")
     val main = SynopticMain.processArgs(args)
     val pGraph = main.createInitialPartitionGraph()
     if (pGraph != null) {
       main.runSynoptic(pGraph)
-      val stateGraph = new DotGraph("temp/output_" + timesRun + ".dot")
+      logger.info("Synoptic completed, parsing dot graph output...")
+      val stateGraph = new StateMachineGraph("temp/output_" + timesRun + ".dot")
       removeFirstCycle(stateGraph, metaTrace)
       None
     } else {
@@ -102,12 +99,13 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
     }
   }
   
-  def removeFirstCycle(stateGraph: DotGraph, metaTrace: MetaEventTrace): Option[EventTrace] = {
-    // Some quick pseudocode for finding a cylce in the state machine and 
+  def removeFirstCycle(stateGraph: StateMachineGraph, metaTrace: MetaEventTrace): Option[EventTrace] = {
+    logger.info("Attempting to remove a cycle")
+    // Some quick pseudocode for finding a cycle in the state machine and
     // creating an EventTrace that would remove it.
 
     // Need some way to skip ahead so we can try to remove other cycles if the 
-    // first cycle found is actually needed to triger the violation.
+    // first cycle found is actually needed to trigger the violation.
 
     
     // eventTrace: the ordered list of events
@@ -123,27 +121,29 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
     var visited = Set(src)
     val eventStack = new Stack[(Node, Node, Event)]()
 
-    var i = 0
     for (event <- events) {
-      val messages = metaTrace.eventToLogOutput(event)
-      var dst = src
-      for (message <- messages) {
-        // don't mark nodes in the middle of an event's messages as seen.
-         dst = stateGraph.resolvePath(dst, labelForLogMessage(message))
-      }
+      if (!MetaEvents.isMetaEvent(event)) {
+        metaTrace.eventToLogOutput.get(event) foreach { messages =>
+          var dst = src
+          for (message <- messages) {
+            // don't mark nodes in the middle of an event's messages as seen.
+            dst = stateGraph.resolvePath(dst, labelForLogMessage(message))
+          }
 
-      if (visited.contains(dst)) {
-        // cycle detected
-        // TODO
-        // save the node that starts/ends the cycle and the event that ended it
-        // find the event that reaches that node first
-        // output the events up to and included that event
-        // output all events after the event that ended the cycle
+          if (visited.contains(dst)) {
+            // cycle detected
+            // TODO
+            // save the node that starts/ends the cycle and the event that ended it
+            // find the event that reaches that node first
+            // output the events up to and included that event
+            // output all events after the event that ended the cycle
 
-      } else {
-        visited += dst
-        eventStack.push((src, dst, event))
-        src = dst
+          } else {
+            visited += dst
+            eventStack.push((src, dst, event))
+            src = dst
+          }
+        }
       }
     }
 
@@ -191,7 +191,7 @@ object HistoricalEventTraces {
   // { EventTrace -> MetaEventTrace }
 }
 
-class DotGraph(filename: String) {
+class StateMachineGraph(filename: String) {
   var idToNodes = Map.empty[Int, Node]
   var labelToNodes = Map.empty[String, Seq[Node]]
   var adjList = Map.empty[Node, Seq[Node]]
@@ -214,11 +214,13 @@ class DotGraph(filename: String) {
   def parseFromFile(filename: String): Unit = {
     val f = new File(filename)
     val s = new Scanner(f)
-    s.nextLine()
+    s.nextLine()  // Skip first line with name of graph
     while (s.hasNextLine) {
       val line = s.nextLine()
-      if (line.startsWith("  ")) {
-        val id = Integer.parseInt(line.split(" "){0})
+      if (line.startsWith("}")) {}  // Skip last line
+      else if (line.startsWith("  ")) {
+        // Handle lines that describe the nodes
+        val id = Integer.parseInt(line.split(" ").filter(!_.isEmpty){0})
 
         val startQuote = line.indexOf('"')
         val endQuote = line.indexOf('"', startQuote + 1)
@@ -234,6 +236,7 @@ class DotGraph(filename: String) {
           labelToNodes += ((label, Seq(node)))
         }
       } else {
+        // Handle lines that describe the edges
         val tokens = line.split("->")
         val source = Integer.parseInt(tokens{0})
         val dest = Integer.parseInt(tokens{1}.split(" "){0})
@@ -250,6 +253,7 @@ class Node(val id: Int, val label: String) {
   override def toString: String = "Node[id=" + id + ", label=" + label + "]"
 }
 
-class State(val regex: String, val label: String) {
-  def synopticRegex: String = "^" + regex + "(?<TYPE=>" + label + ")$"
+case class State(regex: String, label: String) {
+  def synopticRegex: String = "^(?<actor>)" + regex + "(?<TYPE=>" + label + ")$"
 }
+
