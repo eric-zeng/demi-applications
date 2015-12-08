@@ -4,8 +4,7 @@ import java.io.{File, PrintWriter}
 import java.util.Scanner
 import org.slf4j.LoggerFactory
 import synoptic.main.SynopticMain
-import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.Stack
+import scala.collection.mutable.{Queue, ListBuffer, Stack, SynchronizedQueue}
 
 // A RemovalStrategy that maintains a model of the program's state
 // machine, and uses the model to decide which schedules to explore next.
@@ -113,70 +112,45 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
     // eventStack: events seen so far
     // result: a new EventTrace with a cycle removed
 
-
-
     // first node of event trace
     val events = metaTrace.trace.getEvents()
     var src = stateGraph.labelToNodes.get("INITIAL").get.head
     var visited = Set(src)
-    val eventStack = new Stack[(Node, Node, Event)]()
+    val path = new Stack[(Node, Node, Event)]()
 
+    var cycleDetected = false
     for (event <- events) {
-      if (!MetaEvents.isMetaEvent(event)) {
-        metaTrace.eventToLogOutput.get(event) foreach { messages =>
-          var dst = src
-          for (message <- messages) {
-            // don't mark nodes in the middle of an event's messages as seen.
-            dst = stateGraph.resolvePath(dst, labelForLogMessage(message))
-          }
+      metaTrace.eventToLogOutput.get(event) foreach { messages =>
+        var dst = src
+        for (message <- messages) {
+          // don't mark nodes in the middle of an event's messages as seen.
+          dst = stateGraph.resolvePath(dst, labelForLogMessage(message))
+        }
 
-          if (visited.contains(dst)) {
-            // cycle detected
-            // TODO
-            // save the node that starts/ends the cycle and the event that ended it
-            // find the event that reaches that node first
-            // output the events up to and included that event
-            // output all events after the event that ended the cycle
-
-          } else {
-            visited += dst
-            eventStack.push((src, dst, event))
-            src = dst
+        if (!cycleDetected && visited.contains(dst)) {
+          logger.info("Removing cycle")
+          while (path.head._2 != dst) {
+            val popped = path.pop()
+            logger.info(popped._1 + "->" + popped._2)
           }
+          cycleDetected = true
+        } else {
+          visited += dst
+          path.push((src, dst, event))
+          src = dst
         }
       }
     }
 
-    //   if (seen.contains(getNode(cur))) {
-    //     // cycle detected
-    //     cycle = true
-    //     while (getNode(popped) != getNode(cur)) {
-    //       // remove all events in the cycle
-    //       popped = eventStack.pop()
-    //     }
-    //     // reverse the order of the stack
-    //     reverse(eventStack)
-
-    //     while (!eventStack.isEmpty()) {
-    //     // add the events before the cycle
-    //       result.add(eventStack.pop())
-    //     }
-
-    //     while (cur != eventTrace.last)) {
-    //       // add the events after the cycle
-    //       cur = eventTrace.next
-    //       result.add(cur)
-    //     }
-        
-    //   } else {
-    //     eventStack.push(cur)
-    //     seen.add(getNode(cur))
-    //     cur = eventTrace.next
-    //   }
-    // }
-
-    // return result
-    None
+    if (cycleDetected) {
+      val filteredEvents = new SynchronizedQueue[Event]()
+      path map { edge =>
+        filteredEvents += edge._3
+      }
+      Some(new EventTrace(filteredEvents, new Queue[ExternalEvent] ++ metaTrace.trace.original_externals))
+    } else {
+      None
+    }
   }
 }
 // Stores all (Meta)EventTraces that have been executed in the past
@@ -251,6 +225,9 @@ class StateMachineGraph(filename: String) {
 
 class Node(val id: Int, val label: String) {
   override def toString: String = "Node[id=" + id + ", label=" + label + "]"
+  override def equals(other: Any): Boolean = {
+    other.isInstanceOf[Node] && other.asInstanceOf[Node].id == this.id
+  }
 }
 
 case class State(regex: String, label: String) {
