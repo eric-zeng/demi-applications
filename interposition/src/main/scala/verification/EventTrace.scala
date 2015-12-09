@@ -539,18 +539,19 @@ case class EventTrace(val events: SynchronizedQueue[Event], var original_externa
 //  (i) whether the EventTrace resulted in a violation
 //  (ii) a mapping from Event to a list of console output messages that were
 //  emitted as a result of executing that Event. For use with Synoptic.
-class MetaEventTrace(val trace: EventTrace) {
+class MetaEventTrace(val trace: EventTrace, val fingerPrinter: FingerprintFactory) {
   var causedViolation: Boolean = false
   // Invoked by schedulers to mark whether the violation was triggered.
   def setCausedViolation { causedViolation = true }
 
   // Invoked by schedulers to append log messages.
-  val eventToLogOutput = new HashMap[Event,Queue[String]]
+  val eventToLogOutput = new HashMap[MessageFingerprint,Queue[String]]
   def appendLogOutput(msg: String) {
-    if (!(eventToLogOutput contains trace.lastNonMetaEvent)) {
-      eventToLogOutput(trace.lastNonMetaEvent) = new Queue[String]
+    val fingerprint = fingerPrinter.fingerprint(trace.lastNonMetaEvent)
+    if (!(eventToLogOutput contains fingerprint)) {
+      eventToLogOutput(fingerprint) = new Queue[String]
     }
-    eventToLogOutput(trace.lastNonMetaEvent) += msg
+    eventToLogOutput(fingerprint) += msg
   }
 
   // Return an ordered sequence of log output messages emitted by the
