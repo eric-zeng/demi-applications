@@ -196,8 +196,7 @@ class STSScheduler(val schedulerConfig: SchedulerConfig,
     // Bad method name. "reset recorded events"
     event_orchestrator.reset_events
     if (schedulerConfig.storeEventTraces) {
-      HistoricalEventTraces.traces += new MetaEventTrace(
-        event_orchestrator.events)
+      HistoricalEventTraces.traces += new MetaEventTrace(event_orchestrator.events, messageFingerprinter)
     }
 
     currentlyInjecting.set(true)

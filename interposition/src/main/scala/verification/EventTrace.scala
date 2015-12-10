@@ -560,8 +560,9 @@ class MetaEventTrace(val trace: EventTrace, val fingerPrinter: FingerprintFactor
     val result = new Queue[String]
     trace.events.foreach {
       case e =>
-        if (eventToLogOutput contains e) {
-          result ++= eventToLogOutput(e)
+        val print = fingerPrinter.fingerprint(e)
+        if (eventToLogOutput contains print) {
+          result ++= eventToLogOutput(print)
         }
     }
     return result
