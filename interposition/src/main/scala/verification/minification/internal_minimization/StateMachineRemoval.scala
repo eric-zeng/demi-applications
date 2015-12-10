@@ -120,26 +120,30 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
 
     var cycleDetected = false
     for (event <- events) {
-      val fingerprint = messageFingerprinter.fingerprint(event)
-      metaTrace.eventToLogOutput.get(fingerprint) foreach { messages =>
-        var dst = src
-        for (message <- messages) {
-          // don't mark nodes in the middle of an event's messages as seen.
-          dst = stateGraph.resolvePath(dst, labelForLogMessage(message))
-        }
-        logger.info("Traversed " + src + " -> " + dst)
-        if (!cycleDetected && visited.contains(dst)) {
-          logger.info("Removing cycle")
-          while (path.head._2 != dst) {
-            val popped = path.pop()
-            logger.info(popped._1 + "->" + popped._2)
+      event match {
+        case msgEvent: MsgEvent =>
+          val fingerprint = messageFingerprinter.fingerprint(msgEvent.msg)
+          metaTrace.eventToLogOutput.get(fingerprint) foreach { messages =>
+            var dst = src
+            for (message <- messages) {
+              // don't mark nodes in the middle of an event's messages as seen.
+              dst = stateGraph.resolvePath(dst, labelForLogMessage(message))
+            }
+            logger.info("Traversed " + src + " -> " + dst)
+            if (!cycleDetected && visited.contains(dst)) {
+              logger.info("Removing cycle")
+              while (path.head._2 != dst) {
+                val popped = path.pop()
+                logger.info(popped._1 + "->" + popped._2)
+              }
+              cycleDetected = true
+            } else {
+              visited += dst
+              path.push((src, dst, event))
+              src = dst
+            }
           }
-          cycleDetected = true
-        } else {
-          visited += dst
-          path.push((src, dst, event))
-          src = dst
-        }
+        case _ =>
       }
     }
 
