@@ -547,16 +547,11 @@ class MetaEventTrace(val trace: EventTrace, val fingerPrinter: FingerprintFactor
   // Invoked by schedulers to append log messages.
   val eventToLogOutput = new HashMap[MessageFingerprint,Queue[String]]
   def appendLogOutput(msg: String) {
-    trace.lastNonMetaEvent match {
-      case msgEvent: MsgEvent =>
-        val fingerprint = fingerPrinter.fingerprint(msgEvent.msg)
-        if (!(eventToLogOutput contains fingerprint)) {
-          eventToLogOutput(fingerprint) = new Queue[String]
-        }
-        eventToLogOutput(fingerprint) += msg
-      case _ =>
+    val fingerprint = fingerPrinter.fingerprint(trace.lastNonMetaEvent)
+    if (!(eventToLogOutput contains fingerprint)) {
+      eventToLogOutput(fingerprint) = new Queue[String]
     }
-
+    eventToLogOutput(fingerprint) += msg
   }
 
   // Return an ordered sequence of log output messages emitted by the
@@ -564,13 +559,11 @@ class MetaEventTrace(val trace: EventTrace, val fingerPrinter: FingerprintFactor
   def getOrderedLogOutput: Queue[String] = {
     val result = new Queue[String]
     trace.events.foreach {
-      case e: MsgEvent =>
-        val print = fingerPrinter.fingerprint(e.msg)
+      case e =>
+        val print = fingerPrinter.fingerprint(e)
         if (eventToLogOutput contains print) {
           result ++= eventToLogOutput(print)
         }
-
-      case _ =>
     }
     return result
   }
