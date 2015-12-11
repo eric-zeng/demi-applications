@@ -127,7 +127,7 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
           // don't mark nodes in the middle of an event's messages as seen.
           dst = stateGraph.resolvePath(dst, labelForLogMessage(message))
         }
-        logger.info("Traversed " + src + " -> " + dst)
+
         if (!cycleDetected && visited.contains(dst)) {
           logger.info("Removing cycle")
           while (path.head._2 != dst) {
