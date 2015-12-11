@@ -120,8 +120,7 @@ class StateMachineRemoval(originalTrace: EventTrace, messageFingerprinter: Finge
 
     var cycleDetected = false
     for (event <- events) {
-      val fingerprint = messageFingerprinter.fingerprint(event)
-      metaTrace.eventToLogOutput.get(fingerprint) foreach { messages =>
+      metaTrace.eventToLogOutput.get(event) foreach { messages =>
         var dst = src
         for (message <- messages) {
           // don't mark nodes in the middle of an event's messages as seen.
